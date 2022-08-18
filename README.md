@@ -8,3 +8,6 @@ We think about link-prediction in such a heterophilc graph. Specially, we treat 
 ## Baseline Model  
 ## Dataset  
 ## References  
+[2017-Deep Gaussian Embedding of Graphs: Unsupervised Inductive Learning via Ranking](https://arxiv.org/abs/1707.03815)  
+[2020-Multi-scale Attributed Node Embedding](https://arxiv.org/abs/1909.13021)  
+[2022-Restructuring Graph for Higher Homophily via Learnable Spectral Clustering](https://arxiv.org/abs/2206.02386)
