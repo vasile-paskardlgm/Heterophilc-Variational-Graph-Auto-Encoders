@@ -4,18 +4,19 @@ import torch_geometric.datasets as datasets
 import tools
 
 def preprocess(dataset_name:str='CiteSeer',normalization='sym',url:str='.\\',rm_selfloop:bool=True,
-                    train_rat:float=0.8,test_rat:float=0.2):
+                    train_rat:float=0.85,test_rat:float=0.1,neg_rat:int=1):
     #
     '''
     A function used to preprocess the **UNDIRECTED** homophilic graph data. Return feat, posidx, adj
-    dataset_name:str,'Cora'|'Cora_ML'|'CiteSeer'|'PubMed'|'DBLP',all datasets come from torch_geometric.datasets,depend on the paper
-        '2017-Deep Gaussian Embedding of Graphs: Unsupervised Inductive Learning via Ranking';
+    dataset_name:str,'Cora'|'CiteSeer'|'PubMed'|'Photo',all datasets come from torch_geometric.datasets,depend on the paper
+        '2018-Pitfalls of Graph Neural Network Evaluation' & '2016-Revisiting Semi-Supervised Learning with Graph Embeddings';
     1.Parameters:
     normlization:str,'sym'|'rw'|type(None),choose a method to process the Graph Laplacian;
     url:str,default is '.\',head url of the datasets;
     rm_selfloop:bool,whether removes the self-loop or not,default True because of link-prediction;
-    train_rat:float,ratio of training edges,default 0.8;
-    test_rat:float,ratio of testing edges,default 0.2;
+    train_rat:float,ratio of training edges,default 0.85;
+    test_rat:float,ratio of testing edges,default 0.1;
+    neg_rat:int,ratio of (negative sampling : positive edges),default 1;
     2.Returns:
     N_dataset:int,number of nodes;
     feat_dataset:tensor,nodes'feature;
@@ -25,10 +26,17 @@ def preprocess(dataset_name:str='CiteSeer',normalization='sym',url:str='.\\',rm_
     train_posidx_dataset:tensor,training edges of undirected graph;
     test_posidx_dataset:tensor,tesing edges of undirected graph;
     valid_posidx_dataset:tensor,validating edges of undirected graph,it would be type(None) if train+test=1;
+    train_negidx_dataset:tensor,training edges of undirected graph;
+    test_negidx_dataset:tensor,tesing edges of undirected graph;
+    valid_negidx_dataset:tensor,validating edges of undirected graph,it would be type(None) if train+test=1;
     train_nlap:tensor,normalized laplacian of training set; 
     '''
     ##下载数据集以及获得数据集实例化的类
-    dataset = datasets.CitationFull(root=url,name=dataset_name)
+    if (dataset_name=='Cora')|(dataset_name=='CiteSeer')|(dataset_name=='PubMed'):
+        dataset = datasets.Planetoid(root=url,name=dataset_name)
+    elif (dataset_name=='Photo'):
+        dataset = datasets.Amazon(root=url,name=dataset_name)
+
 
     ##数据集类的.data为Data类，print->Data(x=[N,F],edge_index=[2,E],y=[N])，x:Feature，y:Nodes
     ##Data的读取为(X=dataset.data['x']，Index=dataset.data['edge_index']，Node=dataset.data['y'])，全为无向图！！！
@@ -47,8 +55,8 @@ def preprocess(dataset_name:str='CiteSeer',normalization='sym',url:str='.\\',rm_
         posidx_dataset = util.remove_self_loops(posidx_dataset)[0]  ## To remove the self-loop
 
     ## split it into train/test(or add valid) set.All of them are undirected.
-    train_posidx_dataset,test_posidx_dataset,valid_posidx_dataset = tools.train_test_valid_set(num_nodes=N_dataset,edge_index=posidx_dataset,train_rat=train_rat,test_rat=test_rat)
-
+    train_posidx_dataset,train_negidx_dataset,test_posidx_dataset,test_negidx_dataset,valid_posidx_dataset,valid_negidx_dataset,negidx_dataset = tools.train_test_valid_set(num_nodes=N_dataset,edge_index=posidx_dataset,train_rat=train_rat,test_rat=test_rat,neg_rat=neg_rat)
+    
     ## Adjacency. Training set/Original set/Testing set/Validation set
     adj_dataset = torch.sparse_coo_tensor(indices=posidx_dataset,values=torch.ones_like(posidx_dataset[0,:]),size=(N_dataset,N_dataset))
     adj_dataset = adj_dataset.to_dense()
@@ -56,8 +64,11 @@ def preprocess(dataset_name:str='CiteSeer',normalization='sym',url:str='.\\',rm_
     train_adj_dataset = train_adj_dataset.to_dense()
 
     ##Graph Laplacian
-    train_nlap = util.get_laplacian(edge_index=train_posidx_dataset,normalization=normalization,num_nodes=N_dataset)  ##正则化拉普拉斯矩阵，特征值限定为[0,2]，得到lapMat的index与weight
-    train_nlap = torch.sparse_coo_tensor(indices=train_nlap[0],values=train_nlap[1],size=(N_dataset,N_dataset))  ##以填充方式稀疏生成
-    train_nlap = train_nlap.to_dense()  ##变成非稀疏的0填充矩阵
+    ##Normailized graph laplacian, eigenvalue is constrainted in range(0,2)
+    train_nlap = util.get_laplacian(edge_index=train_posidx_dataset,normalization=normalization,num_nodes=N_dataset)
+    train_nlap = torch.sparse_coo_tensor(indices=train_nlap[0],values=train_nlap[1],size=(N_dataset,N_dataset))  ##Generate a sparse matrix with index.
+    train_nlap = train_nlap.to_dense()  ##pad the matrix with 0.
 
-    return N_dataset,feat_dataset, posidx_dataset, adj_dataset,train_adj_dataset,train_posidx_dataset,test_posidx_dataset,valid_posidx_dataset,train_nlap
+    ## Note that all the returns are type(tensor.long()). If you want to use torch.matmul 
+    ##      or others functions in torch, you can trans the returns into type(tensor.float()) with [return].float()
+    return N_dataset,feat_dataset,posidx_dataset,negidx_dataset,adj_dataset,train_adj_dataset,train_posidx_dataset,train_negidx_dataset,test_posidx_dataset,test_negidx_dataset,valid_posidx_dataset,valid_negidx_dataset,train_nlap

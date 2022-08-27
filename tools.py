@@ -110,7 +110,7 @@ def train_test_valid_set(num_nodes,edge_index,train_rat:float=0.8,test_rat:float
 
     return train_posidx,train_negidx,test_posidx,test_negidx,valid_posidx,valid_negidx,negidx
 
-def test(z, pos_edge_index, neg_edge_index):
+def test(z, pos_edge_index, neg_edge_index=None):
     """Given latent variables :obj:`z`, positive edges
     :obj:`pos_edge_index` and negative edges :obj:`neg_edge_index`,
     computes area under the ROC curve (AUC) and average precision (AP)
@@ -123,31 +123,27 @@ def test(z, pos_edge_index, neg_edge_index):
         neg_edge_index (LongTensor): The negative edges to evaluate
             against.
     """
+    if neg_edge_index is None:
+        neg_edge_index = util.negative_sampling(pos_edge_index, z.size(0))
 
     pos_y = z.new_ones(pos_edge_index.size(1))
-    if type(neg_edge_index)!=type(None):
-        neg_y = z.new_zeros(neg_edge_index.size(1))
-        neg_y = neg_y[:pos_y.size(0)]
+    neg_y = z.new_zeros(neg_edge_index.size(1))
+    neg_y = neg_y[:pos_y.size(0)]
     
-    else:
-        neg_y = z.new_zeros(1)
     y = torch.cat([pos_y, neg_y], dim=0)
 
     pos_pred = torch.sigmoid((z[pos_edge_index[0]] * z[pos_edge_index[1]]).sum(dim=1))
-    if type(neg_edge_index)!=type(None):
-        neg_pred = torch.sigmoid((z[neg_edge_index[0]] * z[neg_edge_index[1]]).sum(dim=1))
-        neg_pred = neg_pred[torch.randperm(neg_pred.size(0))]
-        neg_pred = neg_pred[:pos_pred.size(0)]
-    else:
-        neg_pred = torch.sigmoid((z[0]*z[-1]).sum(dim=-1))
-        neg_pred = neg_pred.reshape((1))
+    neg_pred = torch.sigmoid((z[neg_edge_index[0]] * z[neg_edge_index[1]]).sum(dim=1))
+    neg_pred = neg_pred[torch.randperm(neg_pred.size(0))]
+    neg_pred = neg_pred[:pos_pred.size(0)]
+
     pred = torch.cat([pos_pred, neg_pred], dim=0)
 
     y, pred = y.detach().cpu().numpy(), pred.detach().cpu().numpy()
 
     return roc_auc_score(y, pred), average_precision_score(y, pred) 
 
-def recon_loss(z, pos_edge_index, neg_edge_index):
+def recon_loss(z, pos_edge_index, neg_edge_index=None):
     """Given latent variables :obj:`z`, computes the binary cross
     entropy loss for positive edges :obj:`pos_edge_index` and negative
     sampled edges.
@@ -163,9 +159,9 @@ def recon_loss(z, pos_edge_index, neg_edge_index):
 
     pos_loss = -torch.log(
         torch.sigmoid((z[pos_edge_index[0]] * z[pos_edge_index[1]]).sum(dim=1)) + eps).mean()
-    if type(neg_edge_index)!=type(None):
-        neg_loss = -torch.log(1 -torch.sigmoid((z[neg_edge_index[0]] * z[neg_edge_index[1]])) + eps).mean()
-        neg_loss = neg_loss * (pos_edge_index.shape[1]) / (neg_edge_index.shape[1])
-        return pos_loss + neg_loss
-    else: 
-        return pos_loss
+
+    if neg_edge_index is None:
+        neg_edge_index = util.negative_sampling(pos_edge_index, z.size(0))
+    neg_loss = -torch.log(1 -torch.sigmoid((z[neg_edge_index[0]] * z[neg_edge_index[1]]).sum(dim=1)) + eps).mean()
+    return pos_loss + neg_loss
+
