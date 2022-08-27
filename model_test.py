@@ -29,17 +29,17 @@ for _ in range(100):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
 
 ## No Training process when range(0).
-    for epoch in range(1000):
+    for epoch in range(20):
         optimizer.zero_grad()
-        if epoch%10==0:
-            model.eval()
-            _,_,z = model(feat,train_posidx)
-            print("Train result: " , 100 * tool.test(z=z,pos_edge_index=train_posidx,neg_edge_index=train_negidx)[0])
-            print("Valid result: " , 100 * tool.test(z=z,pos_edge_index=valid_posidx,neg_edge_index=valid_negidx)[0])
-            print("Epoch: " , epoch)
-            stop = input("Stop?")
-            if stop==str(1):
-                break
+        #if epoch%10==0:
+        #    model.eval()
+        #    _,_,z = model(feat,train_posidx)
+        #    print("Train result: " , 100 * tool.test(z=z,pos_edge_index=train_posidx,neg_edge_index=train_negidx)[0])
+        #    print("Valid result: " , 100 * tool.test(z=z,pos_edge_index=valid_posidx,neg_edge_index=valid_negidx)[0])
+        #    print("Epoch: " , epoch)
+        #    stop = input("Stop?")
+        #    if stop==str(1):
+        #        break
         
         model.train()
         
@@ -72,9 +72,10 @@ for _ in range(100):
 
 ## The model.eval() is necessary,because of the torch.nn.module
     print('Now start testing')
-    model.eval()
+    
 
     with torch.no_grad():
+        model.eval()
         _,_,z = model(feat,train_posidx)
         #z = model(feat,train_posidx)   ## Graphconv
         #z = model.encode(feat,train_posidx)     ## Models in Pyg
