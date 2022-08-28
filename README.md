@@ -11,7 +11,7 @@ We think about link-prediction in such a heterophilc graph. Specially, we treat 
 ## Baseline Model  
 ## Dataset  
 **All datasets used in our project comes from [PyG](https://pytorch-geometric.readthedocs.io/en/latest/index.html)**  
-[Cora,Citation,PubMed]from the paper[2016-Revisiting Semi-Supervised Learning with Graph Embeddings](https://arxiv.org/abs/1603.08861)  
+[Cora,Citation,PubMed]from the paper [2016-Revisiting Semi-Supervised Learning with Graph Embeddings](https://arxiv.org/abs/1603.08861)  
 ## References  
 [2017-Deep Gaussian Embedding of Graphs: Unsupervised Inductive Learning via Ranking](https://arxiv.org/abs/1707.03815)  
 [2021-Variational Graph Normalized Auto-Encoders](https://arxiv.org/abs/2108.08046)  
