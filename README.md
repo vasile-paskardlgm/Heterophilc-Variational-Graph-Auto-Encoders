@@ -6,7 +6,7 @@
 ## Problem Definition 
 Supposed there is a **Heterophilc graph:G(V,E,X)**, which means the edge(i,j) exists when node i and j are different in their labels. Note that there is another similar but not same definition in **Heterophilc graph:G(V,E,X)**:edge(i,j) exists when node i and j are different in their features.  
   
-We think about link-prediction in such a heterophilc graph. Specially, we treat it as a graph signal processing problem and solve it with a perspective of spectral graph network.
+We think about link-prediction in such a heterophilc graph. Specially, we treat it as a graph signal processing problem and solve it with a perspective of spectral graph network. We will also talk about modeling the correlated latent variants z which denotes a joint distribution in graph.  
 ## Proposed Method  
 ## Baseline Model  
 ## Dataset  
@@ -17,6 +17,7 @@ We think about link-prediction in such a heterophilc graph. Specially, we treat 
 [**amherst41,johnshopkins55**]From the paper [2021-Large Scale Learning on Non-Homophilous Graphs: New Benchmarks and Strong Simple Methods](https://arxiv.org/abs/2110.14446)  
 [**Texas,Wisconsin,Cornell**]From the paper [2020-Geom-GCN: Geometric Graph Convolutional Networks](https://arxiv.org/abs/2002.05287)  
 ## References  
+[2016-Variational Graph Auto-Encoders](https://arxiv.org/abs/1611.07308)
 [2017-Deep Gaussian Embedding of Graphs: Unsupervised Inductive Learning via Ranking](https://arxiv.org/abs/1707.03815)  
 [2021-Variational Graph Normalized Auto-Encoders](https://arxiv.org/abs/2108.08046)  
 [2020-Multi-scale Attributed Node Embedding](https://arxiv.org/abs/1909.13021)  
