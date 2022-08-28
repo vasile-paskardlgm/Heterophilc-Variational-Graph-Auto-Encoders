@@ -10,7 +10,7 @@ We think about link-prediction in such a heterophilc graph. Specially, we treat 
 ## Proposed Method  
 ## Baseline Model  
 ## Dataset  
-**All datasets used in our project comes from [PyG](https://pytorch-geometric.readthedocs.io/en/latest/index.html)**  
+*All datasets used in our project comes from [PyG](https://pytorch-geometric.readthedocs.io/en/latest/index.html)*  
 [**Cora,Citation,PubMed**]From the paper [2016-Revisiting Semi-Supervised Learning with Graph Embeddings](https://arxiv.org/abs/1603.08861)  
 [**Photo**]From the paper [2018-Pitfalls of Graph Neural Network Evaluation](https://arxiv.org/abs/1811.05868)  
 [**chameleon,squirrel,crocodile**]From the paper [2019-Multi-scale Attributed Node Embedding](https://arxiv.org/abs/1909.13021)  
