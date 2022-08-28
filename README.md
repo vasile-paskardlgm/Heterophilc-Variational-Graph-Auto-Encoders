@@ -1,6 +1,7 @@
 # Heterophilc-Variational-Graph-Auto-Encoders
 ***One of the sub-problems of my big idea: "Bridging the gap between Graph Signal Processing and Graph Learning"***  
 ## Logs  
+*(22/08/26) A weird result: Training-free VGAE with only a uniform-initialization performs good (0.77+ in roc_auc_score) in all datasets.*  
 *(22/08/28) We could arive good performance. However, we also found that there are many **inequal comparison, benchmark, baseline and others** in the papers about link-prediction(**Even in most papers about GNN!**)*  
 *(22/08/29) Our targets include: i)**tackling the posterior-collapse while training**; ii)**thinking about why TRAING-FREE model with uniform-initialization would be preforms well the dataset[Texas,Wisconsin]**; iii)**searching for a more sharp and non-uniform-blur distribution**; iv)**finding out the correlation of latent variants z and disentangling them**.*  
 ## Problem Definition 
