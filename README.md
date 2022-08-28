@@ -10,10 +10,10 @@ We think about link-prediction in such a heterophilc graph. Specially, we treat 
 ## Proposed Method  
 ## Baseline Model  
 ## Dataset  
-**All datasets used in our project comes from [PyG](https://pytorch-geometric.readthedocs.io/en/latest/index.html)**
-[Cora,Citation,PubMed]from the paper[2016-Revisiting Semi-Supervised Learning with Graph Embeddings](https://arxiv.org/abs/1603.08861)
+**All datasets used in our project comes from [PyG](https://pytorch-geometric.readthedocs.io/en/latest/index.html)**  
+[Cora,Citation,PubMed]from the paper[2016-Revisiting Semi-Supervised Learning with Graph Embeddings](https://arxiv.org/abs/1603.08861)  
 ## References  
 [2017-Deep Gaussian Embedding of Graphs: Unsupervised Inductive Learning via Ranking](https://arxiv.org/abs/1707.03815)  
-[2021-Variational Graph Normalized Auto-Encoders](https://arxiv.org/abs/2108.08046)
+[2021-Variational Graph Normalized Auto-Encoders](https://arxiv.org/abs/2108.08046)  
 [2020-Multi-scale Attributed Node Embedding](https://arxiv.org/abs/1909.13021)  
-[2022-Restructuring Graph for Higher Homophily via Learnable Spectral Clustering](https://arxiv.org/abs/2206.02386)
+[2022-Restructuring Graph for Higher Homophily via Learnable Spectral Clustering](https://arxiv.org/abs/2206.02386)  
