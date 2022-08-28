@@ -46,21 +46,15 @@ class VGNAEencoder(torch.nn.Module):
     '''
     def __init__(self, in_channels, out_channels):
         super(VGNAEencoder, self).__init__()
-        self.conv1 = torch.nn.Linear(in_channels, 2 * out_channels) 
-        self.batch = torch.nn.BatchNorm1d(2 * out_channels)
-        self.convmu = torch.nn.Linear(2 * out_channels, out_channels) 
-        self.convlogstd = torch.nn.Linear(2 * out_channels, out_channels) 
+        self.convmu = torch.nn.Linear(in_channels, out_channels) 
+        self.convlogstd = torch.nn.Linear(in_channels, out_channels) 
         self.propagate = APPNP(K=1, alpha=0)
-        self.dropout = torch.nn.Dropout(p=0.5)
-        self.act = torch.nn.LeakyReLU()
         VGNAEencoder.reset_param(self)
 
 
     def reset_param(self):
-        reset(self.conv1)
         reset(self.convmu)
         reset(self.convlogstd)
-        reset(self.batch)
     
     def reparam(self,mu,logstd):
 
@@ -72,21 +66,14 @@ class VGNAEencoder(torch.nn.Module):
 
     def forward(self, x, edge_index):
         #
-        ''' Skeleton: (X,A) -> {GCN} -> H -> {GCN(μ,Σ)} -> (μ,Σ,Zeta)'''
-
-        ## GCNx
-        x = self.conv1(x)
-        #x = self.dropout(x)
-        x = self.propagate(x, edge_index)
-        x = self.batch(x)
-        x = self.act(x)
+        ''' Skeleton: (X,A) -> {GCN(μ,Σ)} -> (μ,Σ,Zeta)'''
 
         ## GCNμ
         mu = self.convmu(x)
         mu = self.propagate(mu, edge_index)
 
         ## GCNσ-norm
-        logstd = F.normalize(self.convmu(x),p=2,dim=1) * 1.8
+        logstd = F.normalize(self.convlogstd(x),p=2,dim=1) * 1.8
         logstd = self.propagate(logstd, edge_index)
 
         zeta = self.reparam(mu,logstd)
