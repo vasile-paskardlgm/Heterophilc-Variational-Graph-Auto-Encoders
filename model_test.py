@@ -1,47 +1,48 @@
 import torch
-import hete_preprocessing as heprepcs
-import homo_preprocessing as hoprepcs
+import data_preprocessing as data_preprocess
+import speclus_filter as spcfil
 import tools as tool
-from Graph_Network_LGM import VGNAEencoder,GAEencoder
+from Graph_Network_LGM import VGAEencoder,GAEencoder,Filter_encoder
 
 #torch.manual_seed(12346)
 res_train = []
 res_valid = []
 res_test = []
+loss_value = []
 
 
-for _ in range(100):
-    num_node,feat,posidx,negidx,adj,train_adj,train_posidx,train_negidx,test_posidx,test_negidx,valid_posidx,valid_negidx,train_nlap = hoprepcs.preprocess(dataset_name='Cora',neg_rat=1,train_rat=0.85,test_rat=0.1)
+for _ in range(1):
+    num_node,feat,posidx,negidx,adj,train_adj,train_posidx,train_negidx,test_posidx,test_negidx,valid_posidx,valid_negidx,train_nlap = data_preprocess.preprocess(dataset_name='Texas',neg_rat=1,train_rat=0.85,test_rat=0.1)
     print("The edge rates of the dataset used now is: ")
     print(posidx.shape[1]/(num_node**2-num_node))
 
     ## SC-filter bank preprocessing:
-    #fil_bank, train_eigva, train_eigve = spcfil.adpt_filter_bank(nlap=train_nlap,s=5)
+    #fil_bank, train_eigva, train_eigve = spcfil.adpt_filter_bank(nlap=train_nlap)
     #feat = spcfil.adpt_result_bank(node_fea=feat,filter_bank=fil_bank,eigve=train_eigve) ## Now we get a robust/collaborative features.
 
 ###  Note:The GAE performs well(90%+)and stably when neg_edges are NOT uesd in testing|training at same time, BEST in NONE-NEGATIVE
-###  Note:The VGAE performs well(90%+)when neg_edges are NONE in testing|validating, and neg_edges in training makes model stable.
-    ##Wisconsin , neg_rat=1
+
     #model = GAEencoder(feat.shape[1],16)
-    model = VGNAEencoder(feat.shape[1],128)       ##===================Baseline
+    model = VGAEencoder(feat.shape[1],128)       ##===================Baseline
 
     print('Now start training')
     optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
 
 ## No Training process when range(0).
+## In training processes,every epoch must neg_samp in order to learn more negative information.
     for epoch in range(200):
         optimizer.zero_grad()
         if epoch%1==0:
             with torch.no_grad():
                 model.eval()
                 _,_,z = model(feat,train_posidx)
-                print("Train result: " , 100 * tool.test(z=z,pos_edge_index=train_posidx,neg_edge_index=train_negidx)[0])
-                print("Valid result: " , 100 * tool.test(z=z,pos_edge_index=valid_posidx,neg_edge_index=valid_negidx)[0])
+                print("Train result: " , 100 * tool.test(z=z,pos_edge_index=train_posidx)[0])
+                print("Valid result: " , 100 * tool.test(z=z,pos_edge_index=valid_posidx)[0])
                 print("Epoch: " , epoch)
-        if epoch%20==0:    
-            stop = input("Stop?")
-            if stop==str(1):
-                break
+        #if epoch%20==0:    
+        #    stop = input("Stop?Pause buttom 1 to stop")
+        #    if stop==str(1):
+        #        break
         
         model.train()
         
@@ -50,22 +51,24 @@ for _ in range(100):
         #z = model(feat,train_posidx)   ## Graphconv
         #mu , logstd = model.encoder(feat,train_posidx)   ## Models in Pyg
         #z = model.encode(feat,train_posidx)  ## Models in Pyg
+
         ## Recontruction loss
-        recon_loss = tool.recon_loss(z, pos_edge_index=train_posidx,neg_edge_index=train_negidx)
+        recon_loss = tool.recon_crenloss(z, pos_edge_index=train_posidx)
         ## KL-divergence loss
         kl_loss = -0.5 * torch.mean(torch.sum(1 + 2 * logstd - mu**2 - logstd.exp()**2, dim=1))
 
         ## Why (1/num_node): Avoiding Posteior-Collapse
         loss = recon_loss + (1/num_node) * kl_loss   ##When Variational
         #loss = recon_loss       ##When NO Variational
+        loss_value.append(loss)
 
-#        if (epoch%20)==0:
-#            print("Now loss is: " , loss)
-#            print("Reconstruction loss: " , recon_loss)
-#            print("KL loss: " , kl_loss)
-#            stop = input("Stop?")
-#            if stop == str(1):
-#                break
+        #if (epoch%1)==0:
+        #    print("Now loss is: " , loss)
+        #    print("Reconstruction loss: " , recon_loss)
+        #    print("KL loss: " , kl_loss)
+        #    stop = input("Stop?")
+        #    if stop == str(1):
+        #        break
 
 
         loss.backward()
@@ -75,7 +78,7 @@ for _ in range(100):
 ## The model.eval() is necessary,because of the torch.nn.module
     print('Now start testing')
     
-
+## Note that only in testing do we need to fixed the edges.
     with torch.no_grad():
         model.eval()
         _,_,z = model(feat,train_posidx)

@@ -32,7 +32,7 @@ def invmat_cuda(M):
 ###########################################################
 
 
-def train_test_valid_set(num_nodes,edge_index,train_rat:float=0.8,test_rat:float=0.2,neg_rat:int=2):
+def train_test_valid_set(num_nodes,edge_index,train_rat:float=0.85,test_rat:float=0.1,neg_rat:int=2):
     #
     '''
     This function is used to solve the the problem in torch_geometric. The problem is that the train_test_split function 
@@ -41,8 +41,8 @@ def train_test_valid_set(num_nodes,edge_index,train_rat:float=0.8,test_rat:float
     1.Parameters:
     num_nodes:int,should be the number of Node in the graph
     edge_index:tensor,should be a (2,E) matrix,which indicates the positve edges;
-    train_rat:float,ratio of training edges,default 0.8;
-    test_rat:float,ratio of testing edges,default 0.2;
+    train_rat:float,ratio of training edges,default 0.85;
+    test_rat:float,ratio of testing edges,default 0.1;
     neg_rat:int,ratio of (negative sampling : positive edges),default 2;
     2.Returns:
     train_posidx:tensor,training edges of undirected graph;
@@ -79,8 +79,8 @@ def train_test_valid_set(num_nodes,edge_index,train_rat:float=0.8,test_rat:float
         test_posidx = util.to_undirected(test_posidx)
         valid_posidx = util.to_undirected(valid_posidx)
 
-    ## Negative sampling:
-    negidx = util.negative_sampling(edge_index=posidx,num_nodes=num_nodes,num_neg_samples=neg_rat*(posidx.shape[1]),force_undirected=True)
+    ## Negative sampling:  you must mul the num with 2, otherwise, it will be neg:pos=0.5 
+    negidx = util.negative_sampling(edge_index=posidx,num_nodes=num_nodes,num_neg_samples=2*neg_rat*(posidx.shape[1]),force_undirected=True)
 
     ## Get the all edges:
     adj = torch.sparse_coo_tensor(indices=negidx,values=torch.ones_like(negidx[0,:]),size=(num_nodes,num_nodes))
@@ -110,7 +110,7 @@ def train_test_valid_set(num_nodes,edge_index,train_rat:float=0.8,test_rat:float
 
     return train_posidx,train_negidx,test_posidx,test_negidx,valid_posidx,valid_negidx,negidx
 
-def test(z, pos_edge_index, neg_edge_index=None):
+def test(z, pos_edge_index, neg_edge_index=None,neg_rat:int=1):
     """Given latent variables :obj:`z`, positive edges
     :obj:`pos_edge_index` and negative edges :obj:`neg_edge_index`,
     computes area under the ROC curve (AUC) and average precision (AP)
@@ -122,20 +122,24 @@ def test(z, pos_edge_index, neg_edge_index=None):
             against.
         neg_edge_index (LongTensor): The negative edges to evaluate
             against.
+        neg_rat (int): Rate of neg_edges:pos_edges
     """
+    
     if neg_edge_index is None:
-        neg_edge_index = util.negative_sampling(pos_edge_index, z.size(0))
+        ## you must mul the num with 2, otherwise, it will be neg:pos=0.5 
+        neg_edge_index = util.negative_sampling(edge_index=pos_edge_index, num_nodes=z.size(0),
+            num_neg_samples=2*neg_rat*pos_edge_index.shape[1],force_undirected=True)
 
     pos_y = z.new_ones(pos_edge_index.size(1))
     neg_y = z.new_zeros(neg_edge_index.size(1))
-    neg_y = neg_y[:pos_y.size(0)]
+    #neg_y = neg_y[:pos_y.size(0)]      ## To keep N_neg_edges == N_pos_edges
     
     y = torch.cat([pos_y, neg_y], dim=0)
 
     pos_pred = torch.sigmoid((z[pos_edge_index[0]] * z[pos_edge_index[1]]).sum(dim=1))
     neg_pred = torch.sigmoid((z[neg_edge_index[0]] * z[neg_edge_index[1]]).sum(dim=1))
-    neg_pred = neg_pred[torch.randperm(neg_pred.size(0))]
-    neg_pred = neg_pred[:pos_pred.size(0)]
+    #neg_pred = neg_pred[torch.randperm(neg_pred.size(0))]      ## To keep N_neg_edges == N_pos_edges
+    #neg_pred = neg_pred[:pos_pred.size(0)]
 
     pred = torch.cat([pos_pred, neg_pred], dim=0)
 
@@ -143,7 +147,7 @@ def test(z, pos_edge_index, neg_edge_index=None):
 
     return roc_auc_score(y, pred), average_precision_score(y, pred) 
 
-def recon_loss(z, pos_edge_index, neg_edge_index=None):
+def recon_crenloss(z, pos_edge_index, neg_edge_index=None, neg_training=True, neg_rat:int=1):
     """Given latent variables :obj:`z`, computes the binary cross
     entropy loss for positive edges :obj:`pos_edge_index` and negative
     sampled edges.
@@ -154,14 +158,53 @@ def recon_loss(z, pos_edge_index, neg_edge_index=None):
         neg_edge_index (LongTensor, optional): The negative edges to train
             against. If not given, uses negative sampling to calculate
             negative edges.
+        neg_training (bool): Whether uses negative_edges in training or not.
+        neg_rat (int): Rate of neg_edges:pos_edges
     """
     eps = 1e-15
 
     pos_loss = -torch.log(
         torch.sigmoid((z[pos_edge_index[0]] * z[pos_edge_index[1]]).sum(dim=1)) + eps).mean()
 
-    if neg_edge_index is None:
-        neg_edge_index = util.negative_sampling(pos_edge_index, z.size(0))
-    neg_loss = -torch.log(1 -torch.sigmoid((z[neg_edge_index[0]] * z[neg_edge_index[1]]).sum(dim=1)) + eps).mean()
+    if neg_training:
+        if neg_edge_index is None:
+            ## you must mul the num with 2, otherwise, it will be neg:pos=0.5 
+            neg_edge_index = util.negative_sampling(edge_index=pos_edge_index, num_nodes=z.size(0),
+                num_neg_samples=2*neg_rat*pos_edge_index.shape[1],force_undirected=True)
+        neg_loss = -torch.log(1 -torch.sigmoid((z[neg_edge_index[0]] * z[neg_edge_index[1]]).sum(dim=1)) + eps).mean()
+    else:
+        neg_loss = 0
+
     return pos_loss + neg_loss
 
+def recon_normloss(z, pos_edge_index, neg_edge_index=None, neg_training=True, p=2, neg_rat:int=1):
+    """Given latent variables :obj:`z`, computes the p-norm loss for positive edges :obj:`pos_edge_index` and negative
+    sampled edges.
+
+    Args:
+        z (Tensor): The latent space :math:`\mathbf{Z}`.
+        pos_edge_index (LongTensor): The positive edges to train against.
+        neg_edge_index (LongTensor, optional): The negative edges to train
+            against. If not given, uses negative sampling to calculate
+            negative edges.
+        neg_training (bool): Whether uses negative_edges in training or not.
+        p (float): the order of p-norm
+        neg_rat (int): Rate of neg_edges:pos_edges
+    """
+
+    pos_pred = torch.sigmoid((z[pos_edge_index[0]] * z[pos_edge_index[1]]).sum(dim=1)) 
+    pos_true = torch.ones_like(pos_pred)
+    pos_loss = torch.norm((pos_true-pos_pred),p=p)
+
+    if neg_training:
+        if neg_edge_index is None:
+            ## you must mul the num with 2, otherwise, it will be neg:pos=0.5 
+            neg_edge_index = util.negative_sampling(edge_index=pos_edge_index, num_nodes=z.size(0),
+                num_neg_samples=2*neg_rat*pos_edge_index.shape[1],force_undirected=True)
+        neg_pred = torch.sigmoid((z[neg_edge_index[0]] * z[neg_edge_index[1]]).sum(dim=1)) 
+        neg_true = torch.ones_like(neg_pred)
+        neg_loss = torch.norm((neg_true-neg_pred),p=p)
+    else:
+        neg_loss = 0
+
+    return pos_loss + neg_loss
