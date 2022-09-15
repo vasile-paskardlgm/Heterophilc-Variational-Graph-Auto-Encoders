@@ -19,7 +19,7 @@ We think about link-prediction in such a heterophilc graph. Specially, we treat 
 [**amherst41,johnshopkins55**]From the paper [2021-Large Scale Learning on Non-Homophilous Graphs: New Benchmarks and Strong Simple Methods](https://arxiv.org/abs/2110.14446)  
 [**Texas,Wisconsin,Cornell**]From the paper [2020-Geom-GCN: Geometric Graph Convolutional Networks](https://arxiv.org/abs/2002.05287)  
 ## References  
-[2016-Variational Graph Auto-Encoders](https://arxiv.org/abs/1611.07308)
+[2016-Variational Graph Auto-Encoders](https://arxiv.org/abs/1611.07308)  
 [2017-Deep Gaussian Embedding of Graphs: Unsupervised Inductive Learning via Ranking](https://arxiv.org/abs/1707.03815)  
 [2019-Isolating Sources of Disentanglement in VAEs](https://arxiv.org/abs/1802.04942)  
 [2020-Graph Convolutional Gaussian Processes for Link Prediction](https://arxiv.org/abs/2002.04337)  
