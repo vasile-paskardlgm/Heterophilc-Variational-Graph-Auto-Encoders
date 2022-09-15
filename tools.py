@@ -1,5 +1,6 @@
 import torch
 import torch_geometric.utils as util
+import torch.nn.functional as F
 from torch.linalg import det
 from sklearn.metrics import average_precision_score, roc_auc_score
 
@@ -110,7 +111,7 @@ def train_test_valid_set(num_nodes,edge_index,train_rat:float=0.85,test_rat:floa
 
     return train_posidx,train_negidx,test_posidx,test_negidx,valid_posidx,valid_negidx,negidx
 
-def test(z, pos_edge_index, neg_edge_index=None,neg_rat:int=1):
+def test_inp(z, pos_edge_index, neg_edge_index=None,neg_rat:int=1):
     """Given latent variables :obj:`z`, positive edges
     :obj:`pos_edge_index` and negative edges :obj:`neg_edge_index`,
     computes area under the ROC curve (AUC) and average precision (AP)
@@ -147,7 +148,45 @@ def test(z, pos_edge_index, neg_edge_index=None,neg_rat:int=1):
 
     return roc_auc_score(y, pred), average_precision_score(y, pred) 
 
-def recon_crenloss(z, pos_edge_index, neg_edge_index=None, neg_training=True, neg_rat:int=1):
+def test_norm(z, pos_edge_index, neg_edge_index=None,neg_rat:int=1,normalization=True):
+    """Given latent variables :obj:`z`, positive edges
+    :obj:`pos_edge_index` and negative edges :obj:`neg_edge_index`,
+    computes area under the ROC curve (AUC) and average precision (AP)
+    scores.
+
+    Args:
+        z (Tensor): The latent space :math:`\mathbf{Z}`.
+        pos_edge_index (LongTensor): The positive edges to evaluate
+            against.
+        neg_edge_index (LongTensor): The negative edges to evaluate
+            against.
+        neg_rat (int): Rate of neg_edges:pos_edges
+    """
+    if normalization:
+        z = F.normalize(z)
+
+    if neg_edge_index is None:
+        ## you must mul the num with 2, otherwise, it will be neg:pos=0.5 
+        neg_edge_index = util.negative_sampling(edge_index=pos_edge_index, num_nodes=z.size(0),
+            num_neg_samples=2*neg_rat*pos_edge_index.shape[1],force_undirected=True)
+
+    pos_y = z.new_ones(pos_edge_index.size(1))
+    neg_y = z.new_zeros(neg_edge_index.size(1))
+    
+    y = torch.cat([pos_y, neg_y], dim=0)
+
+    pos_pred = z[pos_edge_index[0]] - z[pos_edge_index[1]]
+    pos_pred = 2 * torch.sigmoid(-1 * (pos_pred * pos_pred).sum(dim=1))
+    neg_pred = z[neg_edge_index[0]] - z[neg_edge_index[1]]
+    neg_pred = 2 * torch.sigmoid(-1 * (neg_pred * neg_pred).sum(dim=1))
+
+    pred = torch.cat([pos_pred, neg_pred], dim=0)
+
+    y, pred = y.detach().cpu().numpy(), pred.detach().cpu().numpy()
+
+    return roc_auc_score(y, pred), average_precision_score(y, pred)
+
+def recon_inploss(z, pos_edge_index, neg_edge_index=None, neg_training=True, neg_rat:int=1):
     """Given latent variables :obj:`z`, computes the binary cross
     entropy loss for positive edges :obj:`pos_edge_index` and negative
     sampled edges.
@@ -177,7 +216,7 @@ def recon_crenloss(z, pos_edge_index, neg_edge_index=None, neg_training=True, ne
 
     return pos_loss + neg_loss
 
-def recon_normloss(z, pos_edge_index, neg_edge_index=None, neg_training=True, p=2, neg_rat:int=1):
+def recon_normloss(z, pos_edge_index, neg_edge_index=None, neg_training=True, p=2, neg_rat:int=1,normalization=True):
     """Given latent variables :obj:`z`, computes the p-norm loss for positive edges :obj:`pos_edge_index` and negative
     sampled edges.
 
@@ -191,20 +230,85 @@ def recon_normloss(z, pos_edge_index, neg_edge_index=None, neg_training=True, p=
         p (float): the order of p-norm
         neg_rat (int): Rate of neg_edges:pos_edges
     """
+    eps = 1e-15
 
-    pos_pred = torch.sigmoid((z[pos_edge_index[0]] * z[pos_edge_index[1]]).sum(dim=1)) 
-    pos_true = torch.ones_like(pos_pred)
-    pos_loss = torch.norm((pos_true-pos_pred),p=p)
+    if normalization:
+        z = F.normalize(z)
+
+    pos_pred = z[pos_edge_index[0]] - z[pos_edge_index[1]]
+    pos_pred = 2 * torch.sigmoid(-1 * (pos_pred * pos_pred).sum(dim=1))
+
+    pos_loss = -torch.log(pos_pred + eps).mean()
 
     if neg_training:
         if neg_edge_index is None:
             ## you must mul the num with 2, otherwise, it will be neg:pos=0.5 
             neg_edge_index = util.negative_sampling(edge_index=pos_edge_index, num_nodes=z.size(0),
                 num_neg_samples=2*neg_rat*pos_edge_index.shape[1],force_undirected=True)
-        neg_pred = torch.sigmoid((z[neg_edge_index[0]] * z[neg_edge_index[1]]).sum(dim=1)) 
-        neg_true = torch.ones_like(neg_pred)
-        neg_loss = torch.norm((neg_true-neg_pred),p=p)
+        neg_pred = z[neg_edge_index[0]] - z[neg_edge_index[1]]
+        neg_pred = 2 * torch.sigmoid(-1 * (neg_pred * neg_pred).sum(dim=1))
+ 
+        neg_loss = -torch.log(neg_pred + eps).mean()
     else:
         neg_loss = 0
 
     return pos_loss + neg_loss
+
+def propagation_loss(z,train_idx,feat,k:int=5,train_adj=None):
+    #
+    '''
+    The propagation loss, which calculates the smoothness of feature
+    1.Parameters:
+    z:Tensor,nodes' embedding;
+    train_idx:LongTensor,the index tensor of positive training edges;
+    feat:Tensor,the nodes'feature;
+    k:int,the highest order of propagation in adjacency matrix, default=5
+    train_adj:Tensor,the adjacency matrix of positive training edges, default=None
+    2.Return:
+    smoothness:Tensor,smoothness loss.
+    '''
+    ## Set the self-loop factor
+    alpha = 0.6
+
+    ## Calculate the adjacency of positive training edges(if not give)
+    if train_adj == None:
+        train_adj = torch.sparse_coo_tensor(indices=train_idx,values=torch.ones_like(train_idx[0,:]),size=(feat.shape[0],feat.shape[0]))
+        train_adj = train_adj.to_dense()
+        train_adj = train_adj.float()
+
+    ## Calculate the recon_adj
+    recon_adj = torch.matmul(z,z.T).sigmoid().float()
+
+    ## Calculate te recon_idx
+    recon_idx = recon_adj.to_sparse()
+
+    ## Get laplacian
+    lap_recon = util.get_laplacian(edge_index=recon_idx.indices(),edge_weight=recon_idx.values(),normalization=None,num_nodes=feat.shape[0])
+    lap_recon = torch.sparse_coo_tensor(indices=lap_recon[0],values=lap_recon[1],size=(feat.shape[0],feat.shape[0]))  ##Generate a sparse matrix with index.
+    lap_recon = lap_recon.to_dense().float()
+
+    lap_train = util.get_laplacian(edge_index=train_idx,normalization=None,num_nodes=feat.shape[0])
+    lap_train = torch.sparse_coo_tensor(indices=lap_train[0],values=lap_train[1],size=(feat.shape[0],feat.shape[0]))  ##Generate a sparse matrix with index.
+    lap_train = lap_train.to_dense().float()
+
+    smoothness = 0
+
+    for time in range(3,k+1):
+        ## propagate
+        x = feat.clone()
+        y = feat.clone()
+        for _ in range(time):
+            x = alpha * x + torch.matmul(recon_adj,x)
+            x = F.normalize(x,2,1)
+            y = alpha * y + torch.matmul(train_adj,y)
+            y = F.normalize(y,2,1)
+
+        ## Calculate the smoothness
+        smn_recon = torch.matmul(torch.matmul(x.T,lap_recon),x).trace()
+        smn_recon = smn_recon/(recon_idx.values().sum())
+        smn_train = torch.matmul(torch.matmul(y.T,lap_train),y).trace()
+        smn_train = smn_train/(train_idx.shape[1])
+
+        smoothness = smoothness + (smn_train - smn_recon).abs()
+
+    return smoothness

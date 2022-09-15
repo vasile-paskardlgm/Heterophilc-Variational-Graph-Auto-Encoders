@@ -21,3 +21,10 @@
     [amherst41] arrive 90.2+ and stable when epochs == 200;
 *   [EN] arrive 87+ when epochs <= 8, more epochs would be worse in performance, stable in 82.4.
 *   [DE] arrive 90+ when epoch == 10, more epochs would fluctuate: (Start:90) -> 88 -> 90(epoch 10) -> 86 -> (87.9~88.1,stable)
+
+# (22/8/31) The loss function selection:
+    [Recon_norm] denotes the 2-norm distance loss, performs well when f * recon_loss, f range(7e-4,15e-4)
+    [Recon_cren] denotes the inner-product loss, performs well when loss = recon_loss + (1/num_nodes) * kl_loss
+
+# (22/9/12) The Smoothness(propagation) loss function:
+    More stable in [Texas] and [Wisconsin], arrives 84+ when epochs in range(40,60)

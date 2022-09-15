@@ -2,6 +2,7 @@ import torch
 import torch_geometric.utils as util
 import torch_geometric.datasets as datasets
 import tools
+import torch.nn.functional as F
 
 def preprocess(dataset_name:str='crocodile',normalization='sym',url:str='.\\',rm_selfloop=True,
                     train_rat:float=0.85,test_rat:float=0.1,neg_rat:int=1):
@@ -51,6 +52,10 @@ def preprocess(dataset_name:str='crocodile',normalization='sym',url:str='.\\',rm
     
     ## Extract the data.
     feat_dataset = dataset.data['x']   ## Features and Nodes number.
+    feat_dataset = F.normalize(feat_dataset, p=2, dim=1)    ## Normalize the feature.
+
+    label_dataset = dataset.data['y']
+
     N_dataset = feat_dataset.shape[0]
 
     if dataset.data.is_undirected():
@@ -81,4 +86,4 @@ def preprocess(dataset_name:str='crocodile',normalization='sym',url:str='.\\',rm
     
     ## Note that all the returns are type(tensor.long()). If you want to use torch.matmul 
     ##      or others functions in torch, you can trans the returns into type(tensor.float()) with [return].float()
-    return N_dataset,feat_dataset,posidx_dataset,negidx_dataset,adj_dataset,train_adj_dataset,train_posidx_dataset,train_negidx_dataset,test_posidx_dataset,test_negidx_dataset,valid_posidx_dataset,valid_negidx_dataset,train_nlap
+    return N_dataset,feat_dataset,posidx_dataset,negidx_dataset,adj_dataset,train_adj_dataset,train_posidx_dataset,train_negidx_dataset,test_posidx_dataset,test_negidx_dataset,valid_posidx_dataset,valid_negidx_dataset,train_nlap,label_dataset
